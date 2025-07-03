@@ -1,0 +1,107 @@
+version: "3.8"
+
+services:
+  # ベクトルストア
+  chroma-db:
+    image: chromadb/chroma
+    container_name: chroma-db
+    ports:
+      - "8000:8000"
+    volumes:
+      - chroma-data:/chroma
+    restart: unless-stopped
+    healthcheck:
+      test:
+        ["CMD", "/bin/bash", "-c", "cat < /dev/null > /dev/tcp/localhost/8000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - fermat-net
+
+  # LLM推論サーバー
+  ollama:
+    image: ollama/ollama
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+    # Ollama公式イメージはデフォルトでserveが実行されている。
+    # また、モデルの事前pull（ダウンロード）は、Ollamaサーバー起動後に別途実行する必要がある
+    #    command: >
+    #      sh -c "ollama pull mistral &&
+    #             ollama serve"
+    restart: unless-stopped
+    networks:
+      - fermat-net
+
+  # データ登録アプリ
+  data-loader:
+    build:
+      context: ./data-loader
+      dockerfile: Dockerfile
+    container_name: data-loader
+    environment:
+      - CHROMA_HOST=chroma-db:8000
+      - DATAVERSE_DOI=${DATAVERSE_DOI}
+    depends_on:
+      chroma-db:
+        condition: service_healthy
+    volumes:
+      - ./data-loader:/app
+    networks:
+      - fermat-net
+    restart: on-failure
+
+  # チャットAPI
+  chat-api:
+    build:
+      context: ./chat-api
+      dockerfile: Dockerfile
+    container_name: chat-api
+    ports:
+      - "8080:8080"
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - CHROMA_HOST=chroma-db:8000
+    depends_on:
+      ollama:
+        condition: service_started
+      chroma-db:
+        condition: service_healthy
+    networks:
+      - fermat-net
+    restart: unless-stopped
+
+  # フロントエンド
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: frontend
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_API_BASE_URL=http://localhost:8080
+    depends_on:
+      chat-api:
+        condition: service_started
+    networks:
+      - fermat-net
+    restart: unless-stopped
+
+volumes:
+  chroma-data:
+  ollama-data:
+
+networks:
+  fermat-net:
+    driver: bridge
