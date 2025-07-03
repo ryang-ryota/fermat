@@ -1,5 +1,7 @@
 # AIチャットアプリ
 
+https://github.com/user-attachments/assets/f58cc85b-aa79-4994-9aef-647251d47222
+
 **OpenAlex API** から取得したフェルマーの最終定理に関する論文をベクトルストア（Chroma）に保存し、Spring Boot＋Ollama（Mistral 7B）＋React でチャットできるAIアプリケーションです。
 
 ---
@@ -33,8 +35,8 @@ fermat-project/
 ### 1. リポジトリをクローン
 
 ```commandline
-git clone https://github.com/your-username/fermat-project.git
-cd fermat-project
+git clone https://github.com/ryang-ryota/fermat.git
+cd fermat
 ```
 
 ### 2. 必要な環境
